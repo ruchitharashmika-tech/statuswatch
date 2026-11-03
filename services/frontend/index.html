@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StatusWatch</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #1c1c1c; }
+  h1 { margin-bottom: 4px; }
+  .sub { color: #666; margin-top: 0; }
+  form { display: flex; gap: 8px; margin: 24px 0; }
+  input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; flex: 1; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer; }
+  button.del { background: #dc2626; padding: 4px 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #eee; }
+  .badge { padding: 2px 10px; border-radius: 12px; font-size: 13px; color: #fff; }
+  .up { background: #16a34a; } .down { background: #dc2626; } .pending { background: #9ca3af; }
+</style>
+</head>
+<body>
+<h1>StatusWatch</h1>
+<p class="sub">Add a website and we will check it every 30 seconds.</p>
+
+<form id="form">
+  <input id="name" placeholder="Name (e.g. My Blog)" required>
+  <input id="url" placeholder="https://example.com" required>
+  <button>Add</button>
+</form>
+
+<table>
+  <thead><tr><th>Name</th><th>URL</th><th>Status</th><th>Latency</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script>
+async function load() {
+  const res = await fetch('/api/monitors');
+  const data = await res.json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = '';
+  for (const m of data) {
+    const status = m.status || 'pending';
+    const tr = document.createElement('tr');
+    const cells = [m.name, m.url];
+    for (const text of cells) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    }
+    const st = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + status;
+    badge.textContent = status.toUpperCase();
+    st.appendChild(badge);
+    tr.appendChild(st);
+    const lat = document.createElement('td');
+    lat.textContent = m.latency_ms ? Math.round(m.latency_ms) + ' ms' : '-';
+    tr.appendChild(lat);
+    const act = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'del';
+    btn.textContent = 'Delete';
+    btn.onclick = async () => { await fetch('/api/monitors/' + m.id, { method: 'DELETE' }); load(); };
+    act.appendChild(btn);
+    tr.appendChild(act);
+    rows.appendChild(tr);
+  }
+}
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('name').value;
+  const url = document.getElementById('url').value;
+  const res = await fetch('/api/monitors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, url })
+  });
+  if (!res.ok) { alert('Invalid URL. Include https://'); return; }
+  e.target.reset();
+  load();
+});
+
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: statuswatch
+      POSTGRES_PASSWORD: statuswatch
+      POSTGRES_DB: statuswatch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U statuswatch"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./services/api
+    environment:
+      DATABASE_URL: postgresql+psycopg2://statuswatch:statuswatch@db:5432/statuswatch
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: ./services/worker
+    environment:
+      DATABASE_URL: postgresql+psycopg2://statuswatch:statuswatch@db:5432/statuswatch
+      CHECK_INTERVAL_SECONDS: "30"
+    depends_on:
+      - api
+    ports:
+      - "9100:9100"
+
+  frontend:
+    build: ./services/frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
